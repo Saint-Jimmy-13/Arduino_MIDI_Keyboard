@@ -1,77 +1,90 @@
+#include <util/delay.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <avr/io.h>
-#include <avr/interrupt.h>
 #include "avr_common/uart.h"
 
-#define F_CPU   16000000UL
-#include <util/delay.h>
+#define MAX_EVENTS  16
 
-#define BUTTON1_PIN PD2
-#define BUTTON2_PIN PD3
+// MIDI Note ON/OFF message constants
+#define MIDI_NOTE_ON    0x90
+#define MIDI_NOTE_OFF   0x80
+#define BASE_MIDI_NOTE  60  // C4
 
-void setup_pins() {
-    // Set buttons as input
-    DDRD &= ~(1 << BUTTON1_PIN);
-    DDRD &= ~(1 << BUTTON2_PIN);
+// Structure to represent a key event
+typedef struct {
+    uint8_t status: 1;  // 1 = pressed, 0 = released
+    uint8_t key: 7; // key number (0 to 15)
+} KeyEvent;
 
-    // Enable pull-up resistors
-    PORTD |= (1 << BUTTON1_PIN);
-    PORTD |= (1 << BUTTON2_PIN);
+uint16_t key_status;    // Current key status
+
+// Function to scan the keyboard matrix
+uint8_t keyScan(KeyEvent* events) {
+    uint16_t new_status = 0;    // New key status
+    int num_events = 0; // Number of events
+    uint8_t key_num = 0;    // Key number (0..15)
+
+    for (int r = 0; r < 4; ++r) {
+        uint8_t row_mask = ~(1 << (r + 4)); // Mask for the output row
+        PORTA = row_mask;   // Set row mask
+        _delay_us(100); // Stabilize signal
+
+        uint8_t row = ~(0x0F & PINA);   // Read the first 4 bits (negated)
+
+        for (int c = 0; c < 4; ++c) {
+            uint16_t key_mask = 1 << key_num;
+            uint16_t col_mask = 1 << c;
+
+            uint8_t cs = (row & col_mask) != 0; // 1 if key pressed
+
+            if (cs) {
+                new_status |= key_mask; // Update new key status
+            }
+
+            uint8_t ps = (key_mask & key_status) != 0;  // Previous key status
+
+            // If the key status has changed, register an event
+            if (cs != ps) {
+                KeyEvent e;
+                e.key = key_num;
+                e.status = cs;
+                events[num_events] = e;
+                ++num_events;
+            }
+            ++key_num;
+        }
+    }
+    key_status = new_status;    // Update global key status
+    return num_events;  // Return number of events
 }
 
-void send_midi_packet(uint8_t pitch, uint16_t duration) {
-    uint8_t velocity = (duration < 128) ? duration : 127;
-
-    // Note ON
-    usart_putchar(0x90);    // Note ON, channel 1
-    usart_putchar(pitch);
-    usart_putchar(velocity);
-
-    _delay_ms(100); // Simulate delay
-
-    // Note OFF
-    usart_putchar(0x80);    // Note OFF, channel 1
-    usart_putchar(pitch);
-    usart_putchar(0x00);
+void send_midi(uint8_t status, uint8_t note, uint16_t velocity) {
+    usart_putchar(status);  // Send Note ON/OFF
+    usart_putchar(note);    // Send the Note value
+    usart_putchar(velocity);    // Send the velocity
 }
 
 int main(void) {
     // Initialize UART for MIDI communication
     printf_init();
 
-    // Configure pins
-    setup_pins();
+    DDRA = 0xF0;    // Set the 4 most significant bits as output, rest as input
+    PORTA = 0x0F;   // Enable pull-up resistors on input bits
 
-    uint16_t button1PressTime = 0;
-    uint16_t button2PressTime = 0;
-
-    // Setup Timer1 for timing
-    TCCR1B |= (1 << CS11);  // Prescaler set to 8, Timer at 2 MHz (0.5 us resolution)
+    KeyEvent events[MAX_EVENTS];
 
     while (1) {
-        // Button 1
-        if (!(PIND & (1 << BUTTON1_PIN))) {
-            if (button1PressTime == 0) {
-                button1PressTime = TCNT1;   // Start timing
+        uint8_t num_events = keyScan(events);   // Scan the keyboard for events
+        for (uint8_t k = 0; k < num_events; ++k) {
+            KeyEvent e = events[k];
+            uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
+            if (e.status == 1) {
+                send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
             }
-        }
-        else if (button1PressTime != 0) {
-            uint16_t duration = TCNT1 - button1PressTime;
-            send_midi_packet(60, duration); // Send MIDI with pitch 60 (C4)
-            button1PressTime = 0;
-        }
-
-        // Button 2
-        if (!(PIND & (1 << BUTTON2_PIN))) {
-            if (button2PressTime == 0) {
-                button2PressTime = TCNT1;   // Start timing
+            else {
+                send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
             }
-        }
-        else if (button2PressTime != 0) {
-            uint16_t duration = TCNT1 - button2PressTime;
-            send_midi_packet(62, duration); // Send MIDI with pitch 62 (D4)
-            button2PressTime = 0;
         }
     }
-
-    return 0;
 }
