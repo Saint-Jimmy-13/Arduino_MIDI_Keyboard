@@ -4,3 +4,5 @@
 *.exe
 token.txt
 .vscode
+*.elf
+*.hex
