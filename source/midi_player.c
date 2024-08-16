@@ -22,9 +22,8 @@ int configure_serial_port(const char* port_name) {
 
     struct termios options;
     tcgetattr(serial_fd, &options);
-    // TODO: How to compile using MIDI standard baud rate (31250)???
-    cfsetispeed(&options, B19200);  // Set baud rate to 31250 for MIDI
-    cfsetospeed(&options, B19200);
+    cfsetispeed(&options, 31250);  // Set baud rate to 31250 for MIDI
+    cfsetospeed(&options, 31250);
 
     options.c_cflag |= (CLOCAL | CREAD);    // Enable receiver and set local mode
     options.c_cflag &= ~PARENB; // No parity
@@ -49,6 +48,23 @@ void send_midi_message(snd_rawmidi_t* midi_out, uint8_t* message) {
 }
 
 int main() {
-    // TODO
+    int serial_fd = configure_serial_port(SERIAL_PORT);
+
+    snd_rawmidi_t* midi_out;
+    if (snd_rawmidi_open(NULL, &midi_out, "virtual", SND_RAWMIDI_NONBLOCK) < 0) {
+        fprintf(stderr, "ERROR opening ALSA MIDI port.\n");
+        return 1;
+    }
+
+    uint8_t midi_message[3];
+    while (1) {
+        if (read(serial_fd, midi_message, 3) == 3) {
+            send_midi_message(midi_out, midi_message);
+        }
+    }
+
+    close(serial_fd);
+    snd_rawmidi_close(midi_out);
+
     return 0;
 }

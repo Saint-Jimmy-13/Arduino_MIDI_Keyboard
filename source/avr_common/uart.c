@@ -12,7 +12,8 @@
 // Macros and Defines
 // ********************************************************************************
 #define BAUD    19600
-#define MYUBRR  F_CPU / 16 / BAUD-1
+#define MIDI_BAUD   31250   // Added by me
+#define MYUBRR  F_CPU / 16 / MIDI_BAUD-1    // F_CPU / 16 / BAUD-1
 
 // ********************************************************************************
 // Function Prototypes
@@ -80,5 +81,5 @@ void printf_init(void){
   stdout = &mystdout;
   
   // fire up the usart
-  usart_init (MYUBRR);
+  usart_init(MYUBRR);
 }
