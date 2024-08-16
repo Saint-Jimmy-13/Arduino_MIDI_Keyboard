@@ -1,3 +1,5 @@
+// gcc -Wall -O2 -o midi_player midi_player.c -lasound
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <alsa/asoundlib.h>
@@ -14,16 +16,21 @@
 
 // Function to configure the serial port
 int configure_serial_port(const char* port_name) {
-    int serial_fd = open(port_name, O_RDWR | O_NOCTTY | O_NDELAY);
+    int serial_fd = open(port_name, O_RDWR | O_NOCTTY);
     if (serial_fd == -1) {
         perror("Unable to open serial port");
         exit(1);
     }
 
     struct termios options;
-    tcgetattr(serial_fd, &options);
-    cfsetispeed(&options, 31250);  // Set baud rate to 31250 for MIDI
-    cfsetospeed(&options, 31250);
+    if (tcgetattr(serial_fd, &options) < 0) {
+        perror("Failed to get terminal attributes");
+        close(serial_fd);
+        exit(1);
+    }
+
+    cfsetispeed(&options, B38400);  // Set baud rate to 31250 for MIDI (38400 for systems without MIDI baud rate)
+    cfsetospeed(&options, B38400);
 
     options.c_cflag |= (CLOCAL | CREAD);    // Enable receiver and set local mode
     options.c_cflag &= ~PARENB; // No parity
@@ -36,7 +43,14 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_cflag &= ~OPOST;  // Raw output
 
-    tcsetattr(serial_fd, TCSANOW, &options);
+    cfmakeraw(&options);    // Set raw mode
+    tcflush(serial_fd, TCIFLUSH);   // Flush the input buffer
+
+    if (tcsetattr(serial_fd, TCSANOW, &options) < 0) {
+        perror("Failed to set terminal attributes");
+        close(serial_fd);
+        exit(1);
+    }
 
     return serial_fd;
 }
@@ -59,6 +73,7 @@ int main() {
     uint8_t midi_message[3];
     while (1) {
         if (read(serial_fd, midi_message, 3) == 3) {
+            printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
             send_midi_message(midi_out, midi_message);
         }
     }

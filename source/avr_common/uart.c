@@ -12,7 +12,7 @@
 // Macros and Defines
 // ********************************************************************************
 #define BAUD    19600
-#define MIDI_BAUD   31250   // Added by me
+#define MIDI_BAUD   38400   // Added by me
 #define MYUBRR  F_CPU / 16 / MIDI_BAUD-1    // F_CPU / 16 / BAUD-1
 
 // ********************************************************************************
