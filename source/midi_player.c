@@ -1,5 +1,3 @@
-// gcc -Wall -O2 -o midi_player midi_player.c -lasound
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <alsa/asoundlib.h>
@@ -16,13 +14,15 @@
 
 // Function to configure the serial port
 int configure_serial_port(const char* port_name) {
-    int serial_fd = open(port_name, O_RDWR | O_NOCTTY);
+    int serial_fd = open(port_name, O_RDWR | O_NOCTTY | O_SYNC);
     if (serial_fd == -1) {
         perror("Unable to open serial port");
         exit(1);
     }
 
     struct termios options;
+    memset(&options, 0, sizeof options);
+
     if (tcgetattr(serial_fd, &options) < 0) {
         perror("Failed to get terminal attributes");
         close(serial_fd);
@@ -33,7 +33,7 @@ int configure_serial_port(const char* port_name) {
     cfsetospeed(&options, B38400);
 
     options.c_cflag |= (CLOCAL | CREAD);    // Enable receiver and set local mode
-    options.c_cflag &= ~PARENB; // No parity
+    options.c_cflag &= ~(PARENB | PARODD);  // No parity
     options.c_cflag &= ~CSTOPB; // 1 stop bit
     options.c_cflag &= ~CSIZE;  // Clear size mask
     options.c_cflag |= CS8; // 8 data bits
@@ -43,8 +43,8 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_cflag &= ~OPOST;  // Raw output
 
-    cfmakeraw(&options);    // Set raw mode
-    tcflush(serial_fd, TCIFLUSH);   // Flush the input buffer
+    // cfmakeraw(&options);    // Set raw mode
+    tcflush(serial_fd, TCIOFLUSH);   // Flush the input buffer
 
     if (tcsetattr(serial_fd, TCSANOW, &options) < 0) {
         perror("Failed to set terminal attributes");
