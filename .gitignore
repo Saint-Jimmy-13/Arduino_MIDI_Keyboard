@@ -2,7 +2,7 @@
 *~
 \#*
 *.exe
-token.txt
+*.txt
 .vscode
 *.elf
 *.hex

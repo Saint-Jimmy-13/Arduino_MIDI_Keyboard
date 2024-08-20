@@ -39,9 +39,13 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag |= CS8; // 8 data bits
 
     options.c_cflag &= ~CRTSCTS;    // No hardware flow control
-    options.c_cflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Raw input
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Raw input
     options.c_cflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_cflag &= ~OPOST;  // Raw output
+
+    options.c_cc[VEOL] = 0;
+    options.c_cc[VEOL2] = 0;
+    options.c_cc[VEOF] = 0x04;
 
     // cfmakeraw(&options);    // Set raw mode
     tcflush(serial_fd, TCIOFLUSH);   // Flush the input buffer
@@ -57,7 +61,7 @@ int configure_serial_port(const char* port_name) {
 
 // Function to send a MIDI message via ALSA
 void send_midi_message(snd_rawmidi_t* midi_out, uint8_t* message) {
-    snd_rawmidi_write(midi_out, message, 3);
+    snd_rawmidi_write(midi_out, message, 4);
     snd_rawmidi_drain(midi_out);
 }
 
@@ -73,6 +77,7 @@ int main() {
     uint8_t midi_message[3];
     while (1) {
         if (read(serial_fd, midi_message, 3) == 3) {
+            printf("Read done!\n");
             printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
             send_midi_message(midi_out, midi_message);
         }
