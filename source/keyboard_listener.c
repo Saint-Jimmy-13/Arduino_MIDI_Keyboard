@@ -9,7 +9,7 @@
 // MIDI Note ON/OFF message constants
 #define MIDI_NOTE_ON    0x90
 #define MIDI_NOTE_OFF   0x80
-#define BASE_MIDI_NOTE  60  // C4
+#define BASE_MIDI_NOTE  60  // C3
 
 // Structure to represent a key event
 typedef struct {
@@ -59,7 +59,7 @@ uint8_t keyScan(KeyEvent* events) {
     return num_events;  // Return number of events
 }
 
-void send_midi(uint8_t status, uint8_t note, uint8_t velocity) {
+void send_midi(uint8_t status, uint8_t note, uint16_t velocity) {
     usart_putchar(status);  // Send Note ON/OFF
     usart_putchar(note);    // Send the Note value
     usart_putchar(velocity);    // Send the velocity
@@ -81,11 +81,11 @@ int main(void) {
             uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
             if (e.status == 1) {
                 send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
-                printf("%02X %02X %02X\n", MIDI_NOTE_ON, note, 127);
+                // printf("ON: [%02X %02X %02X]\n", MIDI_NOTE_ON, note, 127);
             }
             else {
                 send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
-                printf("%02X %02X %02X\n", MIDI_NOTE_OFF, note, 127);
+                // printf("OFF: [%02X %02X %02X]\n", MIDI_NOTE_OFF, note, 0);
             }
         }
     }

@@ -13,7 +13,7 @@
 // ********************************************************************************
 #define BAUD    19600
 #define MIDI_BAUD   38400   // Added by me
-#define MYUBRR  F_CPU / 16 / MIDI_BAUD-1    // F_CPU / 16 / BAUD-1
+#define MYUBRR  (F_CPU / 16 / MIDI_BAUD - 1)    // F_CPU / 16 / BAUD-1
 
 // ********************************************************************************
 // Function Prototypes
@@ -30,7 +30,7 @@ static FILE mystdout = FDEV_SETUP_STREAM(usart_putchar_printf, NULL, _FDEV_SETUP
 // ********************************************************************************
 // usart Related
 // ********************************************************************************
-void usart_init( uint16_t ubrr) {
+void usart_init(uint16_t ubrr) {
     // Set baud rate
     UBRR0H = (uint8_t) (ubrr >> 8);
     UBRR0L = (uint8_t) ubrr;
