@@ -6,6 +6,7 @@ Implementation of a MIDI keyboard using ATMega2560
 
 
 Usage:
+
     1. Flash the keyboard_listener on the Arduino
         make -f listener.mk keyboard_listener.hex
 
