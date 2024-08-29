@@ -38,7 +38,7 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag &= ~CSIZE;  // Clear size mask
     options.c_cflag |= CS8; // 8 data bits
 
-    options.c_cflag &= ~CRTSCTS;    // No hardware flow control
+    // options.c_cflag &= ~CRTSCTS;    // No hardware flow control
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Raw input
     options.c_iflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_oflag &= ~OPOST;  // Raw output
@@ -77,7 +77,7 @@ void start_synth_and_connect() {
     sleep(10);
 
     // Execute aconnect to connect MIDI ports
-    if (system("gnome-terminal -- aconnect 129:0 128:0") != 0) {
+    if (system("gnome-terminal -- aconnect 129:0 128:0 & aconnect -l") != 0) {
         perror("ERROR connecting MIDI ports with aconnect\n");
         exit(1);
     }
@@ -85,9 +85,10 @@ void start_synth_and_connect() {
 
 int main() {
     // Start fluidsynth and connect the MIDI ports
-    // start_synth_and_connect();   // TODO: Unable to connect midi ports with system()
+    start_synth_and_connect();   // TODO: Unable to connect midi ports with system()
 
     int serial_fd = configure_serial_port(SERIAL_PORT);
+    printf("Player ready!\n");
 
     snd_rawmidi_t* midi_out;
     if (snd_rawmidi_open(NULL, &midi_out, "virtual", SND_RAWMIDI_NONBLOCK) < 0) {
