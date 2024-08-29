@@ -1,3 +1,4 @@
+midi_player
 *.o
 *~
 \#*
@@ -6,4 +7,4 @@
 .vscode
 *.elf
 *.hex
-midi_player
+

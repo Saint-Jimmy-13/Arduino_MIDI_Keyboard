@@ -28,6 +28,7 @@ uint8_t keyScan(KeyEvent* events) {
     // Scan keys on PORTA (first 8 keys)
     for (uint8_t key_num = 0; key_num < 8; ++key_num) {
         uint16_t key_mask = 1 << key_num;
+        _delay_us(100); // Stabilize signal
         uint8_t pin_state = PINA & (1 << key_num);  // Read the state of the pin for each key on PORTA
 
         uint8_t cs = (pin_state == 0);  // 1 if key pressed (active low)
@@ -51,6 +52,7 @@ uint8_t keyScan(KeyEvent* events) {
     // Scan keys on PORTC (next 4 keys)
     for (uint8_t key_num = 8; key_num < 12; ++key_num) {
         uint16_t key_mask = 1 << key_num;
+        _delay_us(100); // Stabilize signal
         uint8_t pin_state = PINC & (1 << (key_num - 8));    // Read the state of the pin for each key on PORTC
 
         uint8_t cs = (pin_state == 0);  // 1 if key pressed (active low)
