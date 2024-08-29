@@ -1,128 +1,112 @@
-#include <avr/io.h>
-#include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <avr/io.h>
 #include "avr_common/uart.h"
 
-// Define MIDI commands
+#define MAX_EVENTS      12
+#define DEBOUNCE_DELAY  5   // 5ms debounce delay
+
+// MIDI Note ON/OFF message constants
 #define MIDI_NOTE_ON    0x90
 #define MIDI_NOTE_OFF   0x80
-#define BASE_MIDI_NOTE  60  // C4
-#define NUM_NOTES       12
-#define NUM_CONTROLS    4
+#define BASE_MIDI_NOTE  60  // C3
 
-// Define control pins
-#define OCTAVE_DOWN_PIN PC4
-#define OCTAVE_UP_PIN   PC5
-#define VOLUME_DOWN_PIN PC6
-#define VOLUME_UP_PIN   PC7
+// Structure to represent a key event
+typedef struct {
+    uint8_t status: 1;  // 1 = pressed, 0 = released
+    uint8_t key: 7; // key number (0 to 15)
+} KeyEvent;
 
-// MIDI state
-uint8_t octave_offset = 0;
-uint8_t volume = 127;
+uint16_t key_status = 0;    // Current key status
 
-// Initialize UART and I/O pins
-void init_system(void) {
-    // Initialize UART
-    printf_init();
+// Function to scan the keyboard for 12 keys across PORTA and PORTC
+uint8_t keyScan(KeyEvent* events) {
+    uint16_t new_status = 0;    // New key status
+    int num_events = 0; // Number of events
 
-    // Set PA0 - PA7 as inputs for notes (with pull-up resistors)
-    DDRA &= 0x00;   // Set PA0 - PA7 as inputs
-    PORTA |= 0xFF;  // Enable pull-ups on PA0 - PA7
+    // Scan keys on PORTA (first 8 keys)
+    for (uint8_t key_num = 0; key_num < 8; ++key_num) {
+        uint16_t key_mask = 1 << key_num;
+        uint8_t pin_state = PINA & (1 << key_num);  // Read the state of the pin for each key on PORTA
 
-    // Set PC0 - PC3 as inputs for notes (with pull-up resistors)
-    DDRC &= 0xF0;   // Set PC0 - PC3 as inputs
-    PORTC |= 0x0F;  // Enable pull-ups on PC0 - PC3
+        uint8_t cs = (pin_state == 0);  // 1 if key pressed (active low)
 
-    // Set PC4 - PC7 as inputs for control buttons (with pull-up resistors)
-    DDRC &= 0x0F;   // Set PC4 - PC7 as inputs
-    PORTA |= 0xFF;  // Enable pull-ups on PC4 - PC7
-}
+        if (cs) {
+            new_status |= key_mask; // Update new key status
+        }
 
-// Read the state of the control buttons and update MIDI state
-void check_controls(void) {
-    // Read control buttons (PC4 - PC7)
-    uint8_t control_state = PINC & 0xF0;
+        uint8_t ps = (key_mask & key_status) != 0;  // Previous key status
 
-    if (!(control_state & (1 << (OCTAVE_DOWN_PIN - PC0)))) {
-        if (octave_offset > -24) {
-            octave_offset -= 12;
-            _delay_ms(200); // Simple debounce
+        // If the key status has changed, register an event
+        if (cs != ps) {
+            KeyEvent e;
+            e.key = key_num;
+            e.status = cs;
+            events[num_events] = e;
+            ++num_events;
         }
     }
 
-    if (!(control_state & (1 << (OCTAVE_UP_PIN - PC0)))) {
-        if (octave_offset < 24) {
-            octave_offset += 12;
-            _delay_ms(200); // Simple debounce
+    // Scan keys on PORTC (next 4 keys)
+    for (uint8_t key_num = 8; key_num < 12; ++key_num) {
+        uint16_t key_mask = 1 << key_num;
+        uint8_t pin_state = PINC & (1 << (key_num - 8));    // Read the state of the pin for each key on PORTC
+
+        uint8_t cs = (pin_state == 0);  // 1 if key pressed (active low)
+
+        if (cs) {
+            new_status |= key_mask; // Update new key status
+        }
+
+        uint8_t ps = (key_mask & key_status) != 0;  // Previous key status
+
+        // If the key status has changed, register an event
+        if (cs != ps) {
+            KeyEvent e;
+            e.key = key_num;
+            e.status = cs;
+            events[num_events] = e;
+            ++num_events;
         }
     }
-    
-    if (!(control_state & (1 << (VOLUME_DOWN_PIN - PC0)))) {
-        if (volume > 16) {
-            volume -= 16;
-            _delay_ms(200); // Simple debounce
-        }
-    }
 
-    if (!(control_state & (1 << (VOLUME_UP_PIN - PC0)))) {
-        if (volume < 127) {
-            volume += 16;
-            _delay_ms(200); // Simple debounce
-        }
-    }
-}
-
-// Scan the note buttons and send MIDI messages
-void scan_notes(void) {
-    // Read note buttons (PA0 - PA7 for the first 8 notes)
-    uint8_t note_state_A = PINA & 0xFF;
-
-    // Read note buttons (PC0 - PC3 for the next 4 notes)
-    uint8_t note_state_C = PINC & 0x0F;
-
-    // Process the 8 notes connected to PA0 - PA7
-    for (uint8_t i = 0; i < 8; ++i) {
-        uint8_t mask = (1 << i);
-        uint8_t is_pressed = !(note_state_A & mask);
-
-        uint8_t midi_note = BASE_MIDI_NOTE + i + octave_offset;
-
-        if (is_pressed)
-            send_midi(MIDI_NOTE_ON, midi_note, volume);
-        else
-            send_midi(MIDI_NOTE_OFF, midi_note, 0);
-    }
-
-    // Process the 4 notes connected to PC0 - PC3
-    for (uint8_t i = 0; i < 4; ++i) {
-        uint8_t mask = (1 << i);
-        uint8_t is_pressed = !(note_state_C & mask);
-
-        uint8_t midi_note = BASE_MIDI_NOTE + 8 + i + octave_offset;
-
-        if (is_pressed)
-            send_midi(MIDI_NOTE_ON, midi_note, volume);
-        else
-            send_midi(MIDI_NOTE_OFF, midi_note, 0);
-    }
+    key_status = new_status;    // Update global key status
+    return num_events;  // Return number of events
 }
 
 // Send MIDI message over UART
 void send_midi(uint8_t status, uint8_t note, uint8_t velocity) {
-    usart_putchar(status);
-    usart_putchar(note);
-    usart_putchar(velocity);
+    usart_putchar(status);  // Send Note ON/OFF
+    usart_putchar(note);    // Send the Note value
+    usart_putchar(velocity);    // Send the velocity
 }
 
 int main(void) {
-    init_system();
+    // Initialize UART for MIDI communication
+    printf_init();
+
+    DDRA = 0x00;    // Set all bits of PORTA as input
+    PORTA = 0xFF;   // Enable pull-up resistors on all pins of PORTA
+
+    DDRC = 0x00;    // Set all bits of PORTC as input
+    PORTC = 0xFF;   // Enable pull-up resistors on all pins of PORTC
+
+    KeyEvent events[MAX_EVENTS];
 
     while (1) {
-        check_controls();   // Check control buttons (octave, volume)
-        scan_notes();   // Scan note buttons and send MIDI messages
-        _delay_ms(10);  // Short delay to prevent excessive polling
+        uint8_t num_events = keyScan(events);   // Scan the keyboard for events
+        for (uint8_t k = 0; k < num_events; ++k) {
+            KeyEvent e = events[k];
+            uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
+            if (e.status == 1) {
+                send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
+                // printf("ON: [%02X %02X %02X]\n", MIDI_NOTE_ON, note, 127);
+            }
+            else {
+                send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
+                // printf("OFF: [%02X %02X %02X]\n", MIDI_NOTE_OFF, note, 0);
+            }
+        }
     }
-
-    return 0;
 }
