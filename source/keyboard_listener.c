@@ -17,7 +17,7 @@ typedef struct {
     uint8_t key: 7; // key number (0 to 15)
 } KeyEvent;
 
-uint16_t key_status;    // Current key status
+uint16_t key_status = 0;    // Current key status
 
 // Function to scan the keyboard matrix
 uint8_t keyScan(KeyEvent* events) {
@@ -59,7 +59,7 @@ uint8_t keyScan(KeyEvent* events) {
     return num_events;  // Return number of events
 }
 
-void send_midi(uint8_t status, uint8_t note, uint16_t velocity) {
+void send_midi(uint8_t status, uint8_t note, uint8_t velocity) {
     usart_putchar(status);  // Send Note ON/OFF
     usart_putchar(note);    // Send the Note value
     usart_putchar(velocity);    // Send the velocity
