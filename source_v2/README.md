@@ -22,6 +22,10 @@
         A#: 35
         B:  34
 
-4. The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard.
+4. To close the player connect a wire between pin 12 and GND
+    **N. B.:** Remember to close the opened FluidSynth using *quit* in its terminal
 
-5. Start the music and enjoy!
+5. The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard
+    ![Piano Keyboard](piano_keyboard.jpg)
+
+6. Start the music and enjoy!
