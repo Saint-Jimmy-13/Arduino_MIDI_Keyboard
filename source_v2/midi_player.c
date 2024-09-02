@@ -4,13 +4,24 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <signal.h>
 
 // MIDI serial port
 #define SERIAL_PORT "/dev/ttyACM0"
 
 // ALSA MIDI client and port names
-#define MIDI_CLIENT_NAME    "MIDI Keyboard"
-#define MIDI_PORT_NAME  "MIDI Out"
+// #define MIDI_CLIENT_NAME    "MIDI Keyboard"
+// #define MIDI_PORT_NAME  "MIDI Out"
+
+// Special message for Ctrl+C
+#define CTRL_C  0xFF
+
+volatile sig_atomic_t should_exit = 0;
+
+// Signal handler for Ctrl+C
+void handle_sigint(int sig) {
+    should_exit = 1;
+}
 
 // Function to configure the serial port
 int configure_serial_port(const char* port_name) {
@@ -38,7 +49,7 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag &= ~CSIZE;  // Clear size mask
     options.c_cflag |= CS8; // 8 data bits
 
-    // options.c_cflag &= ~CRTSCTS;    // No hardware flow control
+    options.c_cflag &= ~CRTSCTS;    // No hardware flow control
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Raw input
     options.c_iflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_oflag &= ~OPOST;  // Raw output
@@ -84,8 +95,11 @@ void start_synth_and_connect() {
 }
 
 int main() {
+    // Set up Ctrl+C signal handler
+    signal(SIGINT, handle_sigint);
+
     // Start fluidsynth and connect the MIDI ports
-    start_synth_and_connect();   // TODO: Unable to connect midi ports with system()
+    start_synth_and_connect();
 
     int serial_fd = configure_serial_port(SERIAL_PORT);
     printf("Player ready!\n");
@@ -98,17 +112,24 @@ int main() {
 
     uint8_t midi_message[3];
     int k = 0;
-    while (1) {
+    while (!should_exit) {
         if (read(serial_fd, midi_message, 3) == 3) {
             printf("Read done!\n");
             printf("[it. %d]    ", k++);
             printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
+
+            if (midi_message[0] == CTRL_C) {
+                printf("Well Done!\n");
+                break;
+            }
+
             send_midi_message(midi_out, midi_message);
         }
     }
 
     close(serial_fd);
     snd_rawmidi_close(midi_out);
+    printf("Closed.\n");
 
     return 0;
 }

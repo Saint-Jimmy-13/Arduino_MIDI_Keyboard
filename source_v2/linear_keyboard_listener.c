@@ -5,20 +5,24 @@
 #include "avr_common/uart.h"
 
 #define MAX_EVENTS      12
-#define DEBOUNCE_DELAY  5   // 5ms debounce delay
 
 // MIDI Note ON/OFF message constants
 #define MIDI_NOTE_ON    0x90
 #define MIDI_NOTE_OFF   0x80
 #define BASE_MIDI_NOTE  60  // C3
 
+// Special message for Ctrl+C
+#define CTRL_C  0xFF
+
 // Structure to represent a key event
 typedef struct {
-    uint8_t status: 1;  // 1 = pressed, 0 = released
-    uint8_t key: 7; // key number (0 to 15)
+    uint8_t status;  // 1 = pressed, 0 = released
+    uint8_t key; // key number
 } KeyEvent;
 
 uint16_t key_status = 0;    // Current key status
+
+volatile uint8_t should_exit = 0;
 
 // Function to scan the keyboard for 12 keys across PORTA and PORTC
 uint8_t keyScan(KeyEvent* events) {
@@ -73,6 +77,19 @@ uint8_t keyScan(KeyEvent* events) {
         }
     }
 
+    // Check exit signal on PORTB6
+    _delay_us(100);
+    uint8_t exit_signal = PINB & (1 << 6);  // Check bit 6 of PORTB (Pin 12)
+
+    if (exit_signal == 0) {
+        should_exit = 1;
+        KeyEvent e;
+        e.key = 12; // Use a special key number for the exit signal
+        e.status = 1;
+        events[num_events] = e;
+        ++num_events;
+    }
+
     key_status = new_status;    // Update global key status
     return num_events;  // Return number of events
 }
@@ -94,21 +111,29 @@ int main(void) {
     DDRC = 0x00;    // Set all bits of PORTC as input
     PORTC = 0xFF;   // Enable pull-up resistors on all pins of PORTC
 
+    DDRB &= ~(1 << 6);  // Set PORTB6 as input
+    PORTB |= (1 << 6);  // Enable pull-up resistor on PORTB6
+
     KeyEvent events[MAX_EVENTS];
 
-    while (1) {
+    while (!should_exit) {
         uint8_t num_events = keyScan(events);   // Scan the keyboard for events
         for (uint8_t k = 0; k < num_events; ++k) {
             KeyEvent e = events[k];
-            uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
-            if (e.status == 1) {
-                send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
-                // printf("ON: [%02X %02X %02X]\n", MIDI_NOTE_ON, note, 127);
+            if (e.key == 12 && e.status == 1) {
+                send_midi(CTRL_C, 0, 0);    // Send Ctrl+C message
             }
             else {
-                send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
-                // printf("OFF: [%02X %02X %02X]\n", MIDI_NOTE_OFF, note, 0);
+                uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
+                if (e.status == 1) {
+                    send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
+                }
+                else {
+                    send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
+                }
             }
         }
     }
+    
+    return 0;
 }

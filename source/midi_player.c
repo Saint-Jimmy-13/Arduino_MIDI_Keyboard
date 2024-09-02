@@ -85,7 +85,7 @@ void start_synth_and_connect() {
 
 int main() {
     // Start fluidsynth and connect the MIDI ports
-    start_synth_and_connect();   // TODO: Unable to connect midi ports with system()
+    start_synth_and_connect();
 
     int serial_fd = configure_serial_port(SERIAL_PORT);
     printf("Player ready!\n");
