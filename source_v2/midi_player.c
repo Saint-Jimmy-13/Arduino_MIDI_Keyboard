@@ -9,10 +9,6 @@
 // MIDI serial port
 #define SERIAL_PORT "/dev/ttyACM0"
 
-// ALSA MIDI client and port names
-// #define MIDI_CLIENT_NAME    "MIDI Keyboard"
-// #define MIDI_PORT_NAME  "MIDI Out"
-
 // Special message for Ctrl+C
 #define CTRL_C  0xFF
 
