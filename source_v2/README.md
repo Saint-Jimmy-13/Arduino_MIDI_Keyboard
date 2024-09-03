@@ -27,7 +27,7 @@ If there are errors, see the **MANUAL USAGE** section to find out problems.
     **N. B.:** Remember to close the opened FluidSynth using *quit* in its terminal
 
 5. The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard
-    ![Piano Keyboard](piano_keyboard.jpg)
+    ![Piano Keyboard](images/piano_keyboard.jpg)
 
 6. Start the music and enjoy!
 
