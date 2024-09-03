@@ -1,4 +1,5 @@
 ### USAGE:
+If there are errors, see the **MANUAL USAGE** section to find out problems.
 
 1. Flash the keyboard_listener on the Arduino
     make -f listener.mk keyboard_listener.hex
