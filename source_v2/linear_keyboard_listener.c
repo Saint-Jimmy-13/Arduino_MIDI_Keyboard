@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include "avr_common/uart.h"
 
 #define MAX_EVENTS      12
@@ -21,7 +22,6 @@ typedef struct {
 } KeyEvent;
 
 uint16_t key_status = 0;    // Current key status
-
 volatile uint8_t should_exit = 0;
 
 // Function to scan the keyboard for 12 keys across PORTA and PORTC
@@ -101,6 +101,36 @@ void send_midi(uint8_t status, uint8_t note, uint8_t velocity) {
     usart_putchar(velocity);    // Send the velocity
 }
 
+// Timer Interrupt Service Routine (ISR) for key scanning
+ISR(TIMER0_COMPA_vect) {
+    KeyEvent events[MAX_EVENTS];
+    uint8_t num_events = keyScan(events);   // Scan the keyboard for events
+
+    for (uint8_t k = 0; k < num_events; ++k) {
+        KeyEvent e = events[k];
+        if (e.key == 12 && e.status == 1) {
+            send_midi(CTRL_C, 0, 0);    // Send Ctrl+C message
+        }
+        else {
+            uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
+            if (e.status == 1) {
+                send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
+            }
+            else {
+                send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
+            }
+        }
+    }
+}
+
+// Initialize Timer0 in CTC mode
+void timer_init(void) {
+    TCCR0A = (1 << WGM01);  // Set CTC mode
+    OCR0A = 156;    // Set compare value for 10ms intervals
+    TIMSK0 = (1 << OCIE0A); // Enable compare match interrupt
+    TCCR0B = (1 << CS02) | (1 << CS00); // Start timer with 1024 prescaler
+}
+
 int main(void) {
     // Initialize UART for MIDI communication
     printf_init();
@@ -114,25 +144,14 @@ int main(void) {
     DDRB &= ~(1 << 6);  // Set PORTB6 as input
     PORTB |= (1 << 6);  // Enable pull-up resistor on PORTB6
 
-    KeyEvent events[MAX_EVENTS];
+    // KeyEvent events[MAX_EVENTS];
+
+    // Initialize timer and enable global interrupts
+    timer_init();
+    sei();
 
     while (!should_exit) {
-        uint8_t num_events = keyScan(events);   // Scan the keyboard for events
-        for (uint8_t k = 0; k < num_events; ++k) {
-            KeyEvent e = events[k];
-            if (e.key == 12 && e.status == 1) {
-                send_midi(CTRL_C, 0, 0);    // Send Ctrl+C message
-            }
-            else {
-                uint8_t note = BASE_MIDI_NOTE + e.key;  // Map key number to MIDI note
-                if (e.status == 1) {
-                    send_midi(MIDI_NOTE_ON, note, 127); // Note ON, velocity 127
-                }
-                else {
-                    send_midi(MIDI_NOTE_OFF, note, 0);  // Note OFF, velocity 0
-                }
-            }
-        }
+        // Main loop is empty since all work is done in interrupts
     }
     
     return 0;

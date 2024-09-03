@@ -72,7 +72,7 @@ void send_midi_message(snd_rawmidi_t* midi_out, uint8_t* message) {
     snd_rawmidi_drain(midi_out);
 }
 
-// Function to start fluidsynth using exec
+// Function to start fluidsynth
 void start_synth_and_connect() {
     // Start fluidsynth in background
     if (system("gnome-terminal -- fluidsynth -a alsa") != 0) {
