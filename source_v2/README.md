@@ -47,15 +47,16 @@ You can use the program this way removing the function *start_synth_and_connect(
     fluidsynth
 
 4. Type "aconnect -l" to see current connections, you should see something like
-    cliente 0: 'System' [tipo=kernel]
-        0 'Timer           '
-        1 'Announce        '
-    cliente 14: 'Midi Through' [tipo=kernel]
-        0 'Midi Through Port-0'
-    cliente 128: 'Client-128' [tipo=utente]
-        0 'Virtual RawMIDI '
-    cliente 129: 'FLUID Synth' [tipo=utente]
-        0 'Synth input port (10513:0)'
+
+        cliente 0: 'System' [tipo=kernel]
+            0 'Timer           '
+            1 'Announce        '
+        cliente 14: 'Midi Through' [tipo=kernel]
+            0 'Midi Through Port-0'
+        cliente 128: 'Client-128' [tipo=utente]
+            0 'Virtual RawMIDI '
+        cliente 129: 'FLUID Synth' [tipo=utente]
+            0 'Synth input port (10513:0)'
 
 5. Connect the player program with the synth
     aconnect 128:0 129:0
