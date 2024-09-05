@@ -15,14 +15,39 @@
 // Special message for Ctrl+C
 #define CTRL_C  0xFF
 
+#define BUFFER_SIZE 64
+
 // Structure to represent a key event
 typedef struct {
     uint8_t status;  // 1 = pressed, 0 = released
     uint8_t key; // key number
 } KeyEvent;
 
-uint16_t key_status = 0;    // Current key status
-volatile uint8_t should_exit = 0;
+volatile uint16_t key_status = 0;   // Current key status
+volatile uint8_t should_exit = 0;   // Flag to indicate if CTRL+C arrived
+
+volatile uint8_t uart_buffer[BUFFER_SIZE];
+volatile uint8_t uart_head = 0;
+volatile uint8_t uart_tail = 0;
+
+// Function to initialize UART
+void uart_init(void) {
+    uint16_t ubrr = 25; // Set baud rate to 38400
+    UBRR0H = (ubrr >> 8);
+    UBRR0L = ubrr;
+    UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << UDRIE0);   // Enable RX, TX and UDRIE interrupts
+    UCSR0C = (1 << UCSZ01) | (1 << UCSZ00); // 8 data bits, 1 stop bit, no parity
+}
+
+// Function to enqueue data into UART buffer
+void uart_enqueue(uint8_t data) {
+    uint8_t next_head = (uart_head + 1) % BUFFER_SIZE;
+    if (next_head != uart_tail) {
+        uart_buffer[uart_head] = data;
+        uart_head = next_head;
+        UCSR0B |= (1 << UDRIE0);    // Enable UART Data Register Empty interrupt
+    }
+}
 
 // Function to scan the keyboard for 12 keys across PORTA and PORTC
 uint8_t keyScan(KeyEvent* events) {
@@ -94,9 +119,9 @@ uint8_t keyScan(KeyEvent* events) {
 
 // Send MIDI message over UART
 void send_midi(uint8_t status, uint8_t note, uint8_t velocity) {
-    usart_putchar(status);  // Send Note ON/OFF
-    usart_putchar(note);    // Send the Note value
-    usart_putchar(velocity);    // Send the velocity
+    uart_enqueue(status);  // Send Note ON/OFF
+    uart_enqueue(note);    // Send the Note value
+    uart_enqueue(velocity);    // Send the velocity
 }
 
 // Timer Interrupt Service Routine (ISR) for key scanning
@@ -121,6 +146,17 @@ ISR(TIMER0_COMPA_vect) {
     }
 }
 
+// UART Data Register Empty ISR
+ISR(USART0_UDRE_vect) {
+    if (uart_tail != uart_head) {
+        UDR0 = uart_buffer[uart_tail];
+        uart_tail = (uart_tail + 1) % BUFFER_SIZE;
+    }
+    else {
+        UCSR0B &= ~(1 << UDRIE0);   // Disable UART Data Register Empty interrupt
+    }
+}
+
 // Initialize Timer0 in CTC mode
 void timer_init(void) {
     TCCR0A = (1 << WGM01);  // Set CTC mode
@@ -131,7 +167,8 @@ void timer_init(void) {
 
 int main(void) {
     // Initialize UART for MIDI communication
-    printf_init();
+    // printf_init();
+    uart_init();
 
     DDRA = 0x00;    // Set all bits of PORTA as input
     PORTA = 0xFF;   // Enable pull-up resistors on all pins of PORTA
@@ -141,8 +178,6 @@ int main(void) {
 
     DDRB &= ~(1 << 6);  // Set PORTB6 as input
     PORTB |= (1 << 6);  // Enable pull-up resistor on PORTB6
-
-    // KeyEvent events[MAX_EVENTS];
 
     // Initialize timer and enable global interrupts
     timer_init();

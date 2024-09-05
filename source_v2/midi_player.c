@@ -109,17 +109,21 @@ int main() {
     uint8_t midi_message[3];
     int k = 0;
     while (!should_exit) {
-        if (read(serial_fd, midi_message, 3) == 3) {
-            printf("Read done!\n");
-            printf("[it. %d]    ", k++);
-            printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
-
+        int bytes_read = read(serial_fd, midi_message, 3);
+        if (bytes_read > 0) {
             if (midi_message[0] == CTRL_C) {
                 printf("Well Done!\n");
                 break;
             }
-
-            send_midi_message(midi_out, midi_message);
+            else if (bytes_read == 3) {
+                printf("Read done!\n");
+                printf("[it. %d]    ", k++);
+                printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
+                send_midi_message(midi_out, midi_message);
+            }
+            else {
+                printf("Partial read\n");
+            }
         }
     }
 
