@@ -1,9 +1,9 @@
 #include <util/delay.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "avr_common/uart.h"
+
+#define MIDI_BAUD   38400   
+#define MYUBRR  (F_CPU / 16 / MIDI_BAUD - 1)
 
 #define MAX_EVENTS      12
 
@@ -32,7 +32,7 @@ volatile uint8_t uart_tail = 0;
 
 // Function to initialize UART
 void uart_init(void) {
-    uint16_t ubrr = 25; // Set baud rate to 38400 (F_CPU / 16 / BAUD - 1)
+    uint16_t ubrr = MYUBRR; // Set baud rate to 38400
     UBRR0H = (ubrr >> 8);
     UBRR0L = ubrr;
     UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << UDRIE0);   // Enable RX, TX and UDRIE interrupts
@@ -167,7 +167,6 @@ void timer_init(void) {
 
 int main(void) {
     // Initialize UART for MIDI communication
-    // printf_init();
     uart_init();
 
     DDRA = 0x00;    // Set all bits of PORTA as input

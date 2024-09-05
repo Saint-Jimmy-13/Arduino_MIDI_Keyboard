@@ -12,6 +12,8 @@
 // Special message for Ctrl+C
 #define CTRL_C  0xFF
 
+#define MIDI_MSG_SIZE   3
+
 volatile sig_atomic_t should_exit = 0;
 
 // Signal handler for Ctrl+C
@@ -106,13 +108,13 @@ int main() {
         return 1;
     }
 
-    uint8_t midi_message[3];
-    uint8_t buffer[3];
+    uint8_t midi_message[MIDI_MSG_SIZE];
+    uint8_t buffer[MIDI_MSG_SIZE];
     int buffer_pos = 0;
     int k = 0;
     while (!should_exit) {
         // Read available bytes from the serial port
-        int bytes_read = read(serial_fd, buffer + buffer_pos, 3 - buffer_pos);
+        int bytes_read = read(serial_fd, buffer + buffer_pos, MIDI_MSG_SIZE - buffer_pos);
         if (bytes_read > 0) {
             buffer_pos += bytes_read;
 
@@ -122,9 +124,9 @@ int main() {
             }
 
             // Check if there is a full MIDI message
-            if (buffer_pos == 3) {
+            if (buffer_pos == MIDI_MSG_SIZE) {
                 // Copy the buffer into the MIDI message and reset buffer_pos
-                memcpy(midi_message, buffer, 3);
+                memcpy(midi_message, buffer, MIDI_MSG_SIZE);
                 buffer_pos = 0;
 
                 printf("Read done!\n");
