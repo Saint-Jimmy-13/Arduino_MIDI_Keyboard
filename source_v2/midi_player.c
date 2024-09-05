@@ -107,22 +107,30 @@ int main() {
     }
 
     uint8_t midi_message[3];
+    uint8_t buffer[3];
+    int buffer_pos = 0;
     int k = 0;
     while (!should_exit) {
-        int bytes_read = read(serial_fd, midi_message, 3);
+        // Read available bytes from the serial port
+        int bytes_read = read(serial_fd, buffer + buffer_pos, 3 - buffer_pos);
         if (bytes_read > 0) {
-            if (midi_message[0] == CTRL_C) {
+            buffer_pos += bytes_read;
+
+            if (buffer[0] == CTRL_C) {
                 printf("Well Done!\n");
                 break;
             }
-            else if (bytes_read == 3) {
+
+            // Check if there is a full MIDI message
+            if (buffer_pos == 3) {
+                // Copy the buffer into the MIDI message and reset buffer_pos
+                memcpy(midi_message, buffer, 3);
+                buffer_pos = 0;
+
                 printf("Read done!\n");
                 printf("[it. %d]    ", k++);
                 printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
                 send_midi_message(midi_out, midi_message);
-            }
-            else {
-                printf("Partial read\n");
             }
         }
     }

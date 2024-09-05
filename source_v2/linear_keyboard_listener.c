@@ -32,7 +32,7 @@ volatile uint8_t uart_tail = 0;
 
 // Function to initialize UART
 void uart_init(void) {
-    uint16_t ubrr = 25; // Set baud rate to 38400
+    uint16_t ubrr = 25; // Set baud rate to 38400 (F_CPU / 16 / BAUD - 1)
     UBRR0H = (ubrr >> 8);
     UBRR0L = ubrr;
     UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << UDRIE0);   // Enable RX, TX and UDRIE interrupts
