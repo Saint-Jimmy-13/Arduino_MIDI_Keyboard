@@ -4,13 +4,27 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/wait.h>
 
 // MIDI serial port
 #define SERIAL_PORT "/dev/ttyACM0"
 
-// ALSA MIDI client and port names
-#define MIDI_CLIENT_NAME    "MIDI Keyboard"
-#define MIDI_PORT_NAME  "MIDI Out"
+// Special message for Ctrl+C
+#define CTRL_C  0xFF
+
+#define MIDI_MSG_SIZE   3
+
+volatile sig_atomic_t should_exit = 0;
+
+// Global variable to store FluidSynth process ID
+pid_t fluidsynth_pid = -1;
+
+// Signal handler for Ctrl+C
+void handle_sigint(int sig) {
+    should_exit = 1;
+}
 
 // Function to configure the serial port
 int configure_serial_port(const char* port_name) {
@@ -38,7 +52,7 @@ int configure_serial_port(const char* port_name) {
     options.c_cflag &= ~CSIZE;  // Clear size mask
     options.c_cflag |= CS8; // 8 data bits
 
-    // options.c_cflag &= ~CRTSCTS;    // No hardware flow control
+    options.c_cflag &= ~CRTSCTS;    // No hardware flow control
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Raw input
     options.c_iflag &= ~(IXON | IXOFF | IXANY); // No software flow control
     options.c_oflag &= ~OPOST;  // Raw output
@@ -65,27 +79,51 @@ void send_midi_message(snd_rawmidi_t* midi_out, uint8_t* message) {
     snd_rawmidi_drain(midi_out);
 }
 
-// Function to start fluidsynth using exec
-void start_synth_and_connect() {
-    // Start fluidsynth in background
-    if (system("gnome-terminal -- fluidsynth -a alsa") != 0) {
-        perror("ERROR starting FluidSynth\n");
+// Function to start fluidsynth as a child process
+void start_fluidsynth(const char* soundfont) {
+    fluidsynth_pid = fork();
+    if (fluidsynth_pid < 0) {
+        perror("fork() failed");
         exit(1);
     }
+    else if (fluidsynth_pid == 0) {
+        if (!strcmp(soundfont, "default")) {
+            execlp("fluidsynth", "fluidsynth", "-a", "alsa", NULL);
+            perror("execlp failed to start FluidSynth");
+            exit(1);
+        }
+        else {
+            execlp("fluidsynth", "fluidsynth", "-a", "alsa", soundfont, NULL);
+            perror("execlp failed to start FluidSynth");
+            exit(1);
+        }
+    }
+    sleep(3);
+}
 
-    // Wait a moment to ensure fluidsynth is ready
-    sleep(10);
-
-    // Execute aconnect to connect MIDI ports
-    if (system("gnome-terminal -- aconnect 129:0 128:0 & aconnect -l") != 0) {
-        perror("ERROR connecting MIDI ports with aconnect\n");
-        exit(1);
+void connect_midi_ports() {
+    if (system("aconnect 129:0 128:0") != 0) {
+        perror("ERROR connecting MIDI ports with aconnect");
     }
 }
 
-int main() {
-    // Start fluidsynth and connect the MIDI ports
-    start_synth_and_connect();
+int main(int argc, char* argv[]) {
+    // Set up Ctrl+C signal handler
+    signal(SIGINT, handle_sigint);
+
+    // Choose a soundfont from 'sounds' directory
+    const char* soundfont;
+    if (argc > 1) {
+        soundfont = argv[1];
+        printf("Soundfont: %s\n", argv[1]);
+    }
+    else {
+        soundfont = "default";
+        printf("Soundfont: Default (use ./midi_player sounds/<sound>.sf2 to change)\n");
+    }
+
+    // Start fluidsynth
+    start_fluidsynth(soundfont);
 
     int serial_fd = configure_serial_port(SERIAL_PORT);
     printf("Player ready!\n");
@@ -93,22 +131,56 @@ int main() {
     snd_rawmidi_t* midi_out;
     if (snd_rawmidi_open(NULL, &midi_out, "virtual", SND_RAWMIDI_NONBLOCK) < 0) {
         fprintf(stderr, "ERROR opening ALSA MIDI port.\n");
+        // Clean up FluidSynth before exiting
+        if (fluidsynth_pid > 0) {
+            kill(fluidsynth_pid, SIGTERM);
+            waitpid(fluidsynth_pid, NULL, 0);
+        }
         return 1;
     }
 
-    uint8_t midi_message[3];
+    // Connect the MIDI ports
+    connect_midi_ports();
+
+    uint8_t midi_message[MIDI_MSG_SIZE];
+    uint8_t buffer[MIDI_MSG_SIZE];
+    int buffer_pos = 0;
     int k = 0;
-    while (1) {
-        if (read(serial_fd, midi_message, 3) == 3) {
-            printf("Read done!\n");
-            printf("[it. %d]    ", k++);
-            printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
-            send_midi_message(midi_out, midi_message);
+    while (!should_exit) {
+        // Read available bytes from the serial port
+        int bytes_read = read(serial_fd, buffer + buffer_pos, MIDI_MSG_SIZE - buffer_pos);
+        if (bytes_read > 0) {
+            buffer_pos += bytes_read;
+
+            if (buffer[0] == CTRL_C) {
+                printf("Well Done!\n");
+                break;
+            }
+
+            // Check if there is a full MIDI message
+            if (buffer_pos == MIDI_MSG_SIZE) {
+                // Copy the buffer into the MIDI message and reset buffer_pos
+                memcpy(midi_message, buffer, MIDI_MSG_SIZE);
+                buffer_pos = 0;
+
+                printf("Read done!\n");
+                printf("[it. %d]    ", k++);
+                printf("MIDI message received: %02X %02X %02X\n", midi_message[0], midi_message[1], midi_message[2]);
+                send_midi_message(midi_out, midi_message);
+            }
         }
     }
 
     close(serial_fd);
     snd_rawmidi_close(midi_out);
+
+    // Shut down FluidSynth by sending SIGTERM to the child process and wait for it to exit
+    if (fluidsynth_pid > 0) {
+        kill(fluidsynth_pid, SIGTERM);
+        waitpid(fluidsynth_pid, NULL, 0);
+        printf("FluidSynth terminated.\n");
+    }
+    printf("Closed.\n");
 
     return 0;
 }
