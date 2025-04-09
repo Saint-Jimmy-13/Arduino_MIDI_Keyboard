@@ -28,6 +28,6 @@
 ##### To close the player connect a wire between pin 12 and GND.
 
 ##### The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard.
-    ![Piano Keyboard](images/piano_keyboard.jpg)
+![Piano Keyboard](images/piano_keyboard.jpg)
 
 ##### Start the music and enjoy!
