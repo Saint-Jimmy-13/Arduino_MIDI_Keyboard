@@ -80,14 +80,14 @@ void send_midi_message(snd_rawmidi_t* midi_out, uint8_t* message) {
 }
 
 // Function to start fluidsynth as a child process
-void start_fluidsynth() {
+void start_fluidsynth(const char* soundfont) {
     fluidsynth_pid = fork();
     if (fluidsynth_pid < 0) {
         perror("fork() failed");
         exit(1);
     }
     else if (fluidsynth_pid == 0) {
-        execlp("fluidsynth", "fluidsynth", "-a", "alsa", "sounds/Rotary_Organ.sf2", (char*)NULL);
+        execlp("fluidsynth", "fluidsynth", "-a", "alsa", soundfont, NULL);
         perror("execlp failed to start FluidSynth");
         exit(1);
     }
@@ -104,8 +104,10 @@ int main() {
     // Set up Ctrl+C signal handler
     signal(SIGINT, handle_sigint);
 
+    // Choose a soundfont from 'sounds' directory
+    const char* soundfont = "sounds/Rotary_Organ.sf2";
     // Start fluidsynth
-    start_fluidsynth();
+    start_fluidsynth(soundfont);
 
     int serial_fd = configure_serial_port(SERIAL_PORT);
     printf("Player ready!\n");
