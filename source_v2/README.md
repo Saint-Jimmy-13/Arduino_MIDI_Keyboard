@@ -1,13 +1,21 @@
 ### USAGE:
 ###### You need to have FluidSynth installed!
-    'sudo apt-get install fluidsynth'
+    '''bash
+    sudo apt-get install fluidsynth
+    '''
 
 1. Flash the keyboard_listener on the Arduino.
-    'make -f linear_listener.mk linear_keyboard_listener.hex'
+    '''bash
+    make -f linear_listener.mk linear_keyboard_listener.hex
+    '''
 
 2. Compile and start the midi_player.
-    'make -f player.mk'
-    './midi_player'
+    '''bash
+    make -f player.mk
+    '''
+    '''bash
+    ./midi_player
+    '''
 
 3. Connect a wire to a pin and to GND in order to obtain the following notes:
 
