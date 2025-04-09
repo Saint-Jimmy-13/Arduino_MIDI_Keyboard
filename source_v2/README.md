@@ -1,21 +1,16 @@
 ### USAGE:
 ###### You need to have FluidSynth installed!
-'''
-sudo apt-get install fluidsynth
-'''
+    sudo apt-get install fluidsynth
 
-1. Flash the keyboard_listener on the Arduino.
-'''
-make -f linear_listener.mk linear_keyboard_listener.hex
-'''
+##### Flash the keyboard_listener on the Arduino.
+    make -f linear_listener.mk linear_keyboard_listener.hex
 
-2. Compile and start the midi_player.
-'''
-make -f player.mk
-./midi_player [sounds/<sound>.sf2]
-'''
+##### Compile and start the midi_player.
+    make -f player.mk
 
-3. Connect a wire to a pin and to GND in order to obtain the following notes:
+    ./midi_player [sounds/<sound>.sf2]
+
+##### Connect a wire to a pin and to GND in order to obtain the following notes:
 
         C:  22
         C#: 23
@@ -30,9 +25,9 @@ make -f player.mk
         A#: 35
         B:  34
 
-4. To close the player connect a wire between pin 12 and GND.
+##### To close the player connect a wire between pin 12 and GND.
 
-5. The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard.
+##### The image in this folder provides a raw way to simulate a piano keyboard using some buttons and a breadboard.
     ![Piano Keyboard](images/piano_keyboard.jpg)
 
-6. Start the music and enjoy!
+##### Start the music and enjoy!
