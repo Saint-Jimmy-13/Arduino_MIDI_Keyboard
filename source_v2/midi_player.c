@@ -87,9 +87,16 @@ void start_fluidsynth(const char* soundfont) {
         exit(1);
     }
     else if (fluidsynth_pid == 0) {
-        execlp("fluidsynth", "fluidsynth", "-a", "alsa", soundfont, NULL);
-        perror("execlp failed to start FluidSynth");
-        exit(1);
+        if (!strcmp(soundfont, "default")) {
+            execlp("fluidsynth", "fluidsynth", "-a", "alsa", NULL);
+            perror("execlp failed to start FluidSynth");
+            exit(1);
+        }
+        else {
+            execlp("fluidsynth", "fluidsynth", "-a", "alsa", soundfont, NULL);
+            perror("execlp failed to start FluidSynth");
+            exit(1);
+        }
     }
     sleep(3);
 }
@@ -100,12 +107,21 @@ void connect_midi_ports() {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     // Set up Ctrl+C signal handler
     signal(SIGINT, handle_sigint);
 
     // Choose a soundfont from 'sounds' directory
-    const char* soundfont = "sounds/Rotary_Organ.sf2";
+    const char* soundfont;
+    if (argc > 1) {
+        soundfont = argv[1];
+        printf("Soundfont: %s\n", argv[1]);
+    }
+    else {
+        soundfont = "default";
+        printf("Soundfont: Default (use ./midi_player sounds/<sound>.sf2 to change)\n");
+    }
+
     // Start fluidsynth
     start_fluidsynth(soundfont);
 
